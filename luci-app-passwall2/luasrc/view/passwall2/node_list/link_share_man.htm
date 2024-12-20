@@ -367,6 +367,8 @@ local api = require "luci.passwall2.api"
 			} else if (v_transport === "xhttp") {
 				params += opt.query("host", dom_prefix + "xhttp_host");
 				params += opt.query("path", dom_prefix + "xhttp_path");
+				params += opt.query("mode", dom_prefix + "xhttp_mode");
+				params += opt.query("extra", dom_prefix + "xhttp_extra");
 			}
 			params += "&type=" + v_transport;
 
@@ -955,6 +957,18 @@ local api = require "luci.passwall2.api"
 				opt.set(dom_prefix + 'grpc_mode', queryParam.mode || "gun");
 			}
 
+			opt.set(dom_prefix + 'tls', queryParam.security === "tls");
+			if (queryParam.security === "tls") {
+				var tls_serverName = queryParam.peer;
+				if (queryParam.sni) {
+					tls_serverName = queryParam.sni
+				}
+				opt.set(dom_prefix + 'tls_serverName', tls_serverName);
+			}
+			if (queryParam.allowinsecure === '1') {
+				opt.set(dom_prefix + 'tls_allowInsecure', true);
+			}
+
 			opt.set(dom_prefix + 'mux', queryParam.mux === '1');
 			if (m.hash) {
 				opt.set('remarks', decodeURIComponent(m.hash.substr(1)));
@@ -1069,7 +1083,7 @@ local api = require "luci.passwall2.api"
 				}
 			}
 
-			opt.set(dom_prefix + 'encryption', queryParam.encryption);
+			opt.set(dom_prefix + 'encryption', queryParam.encryption || "none");
 			if (queryParam.security) {
 				if (queryParam.security == "tls") {
 					opt.set(dom_prefix + 'tls', true);
@@ -1154,6 +1168,8 @@ local api = require "luci.passwall2.api"
 			} else if (queryParam.type === "xhttp" || queryParam.type === "splithttp") {
 				opt.set(dom_prefix + 'xhttp_host', queryParam.host || "");
 				opt.set(dom_prefix + 'xhttp_path', queryParam.path || "");
+				opt.set(dom_prefix + 'xhttp_mode', queryParam.mode || "auto");
+				opt.set(dom_prefix + 'xhttp_extra', queryParam.extra || "");
 			}
 
 			if (m.hash) {

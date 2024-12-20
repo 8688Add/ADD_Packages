@@ -172,6 +172,12 @@ msgstr "直连 DNS 解析结果写入到 IPSet"
 msgid "Perform the matching direct domain name rules into IP to IPSet/NFTSet, and then connect directly (not entering the core). Maybe conflict with some special circumstances."
 msgstr "将匹配到的直连规则的域名解析IP写入到 IPSet/NFTSet，然后直连（不进入内核）。可能和某些特殊情况冲突。"
 
+msgid "DNS Redirect"
+msgstr "DNS 重定向"
+
+msgid "Force special DNS server to need proxy devices."
+msgstr "强制需要代理的设备使用专用 DNS 服务器。"
+
 msgid "Clear IPSet"
 msgstr "清空 IPSet"
 
@@ -568,17 +574,32 @@ msgstr "单位：秒"
 msgid "Units:minutes"
 msgstr "单位：分钟"
 
-msgid "Open and close automatically"
-msgstr "定时自动开关"
+msgid "stop automatically mode"
+msgstr "定时关闭模式"
 
-msgid "Automatically turn off time"
-msgstr "自动关闭时间"
+msgid "stop Time(Every day)"
+msgstr "关闭时间(每天)"
 
-msgid "Automatically turn on time"
-msgstr "自动开启时间"
+msgid "stop Interval(Hour)"
+msgstr "关闭间隔(小时)"
 
-msgid "Automatically restart time"
-msgstr "自动重启时间"
+msgid "start automatically mode"
+msgstr "定时开启模式"
+
+msgid "start Time(Every day)"
+msgstr "开启时间(每天)"
+
+msgid "start Interval(Hour)"
+msgstr "开启间隔(小时)"
+
+msgid "restart automatically mode"
+msgstr "定时重启模式"
+
+msgid "restart Time(Every day)"
+msgstr "重启时间(每天)"
+
+msgid "restart Interval(Hour)"
+msgstr "重启间隔(小时)"
 
 msgid "Forwarding Settings"
 msgstr "转发配置"
@@ -814,11 +835,23 @@ msgstr "每周日"
 msgid "hour"
 msgstr "小时"
 
+msgid "Hour"
+msgstr "小时"
+
 msgid "Location of V2ray/Xray asset"
 msgstr "V2ray/Xray 资源文件目录"
 
 msgid "This variable specifies a directory where geoip.dat and geosite.dat files are."
 msgstr "此变量指定geoip.dat和geosite.dat文件所在的目录。"
+
+msgid "Enable Geo Data Parsing"
+msgstr "开启 Geo 数据解析"
+
+msgid "Analyzes and preloads GeoIP/Geosite data to enhance the shunt performance of Sing-box/Xray."
+msgstr "分析和预加载 GeoIP/Geosite 数据，以增强 Sing-box/Xray 的分流效果。"
+
+msgid "Note: Increases resource usage."
+msgstr "注：会增加一些系统资源的开销。"
 
 msgid "Shunt Rule"
 msgstr "分流规则"
@@ -888,6 +921,9 @@ msgstr "订阅备注（机场）"
 
 msgid "Subscribe URL"
 msgstr "订阅网址"
+
+msgid "Subscribe URL Access Method"
+msgstr "订阅网址访问方式"
 
 msgid "Please input the subscription url first, save and submit before manual subscription."
 msgstr "请输入订阅网址保存应用后再手动订阅。"
@@ -1381,26 +1417,8 @@ msgstr "客户端文件不适合当前设备。"
 msgid "Can't move new file to path: %s"
 msgstr "无法移动新文件到：%s"
 
-msgid "XHTTP download splitting"
-msgstr "XHTTP 下行分离"
-
-msgid "Must be the same as upload path."
-msgstr "必须与上行 path 相同。"
-
-msgid "Enable XHTTP XMUX. It's not recommended to enable Mux.Cool at the same time."
-msgstr "启用 XHTTP XMUX。不建议与 Mux.Cool 同时启用。"
-
-msgid "XMUX Max Concurrency"
-msgstr "XMUX 连接最大复用流数"
-
-msgid "XMUX Max Connections"
-msgstr "XMUX 最大连接数"
-
-msgid "XMUX Connection Max Reuse Times"
-msgstr "XMUX 连接最多复用次数"
-
-msgid "XMUX Connection Max Lifetime (ms)"
-msgstr "XMUX 连接最大存活时间（ms）"
+msgid "An <a target='_blank' href='https://xtls.github.io/config/transports/splithttp.html#extra'>XHTTP extra object</a> in raw json"
+msgstr "一个 json 格式的 <a target='_blank' href='https://xtls.github.io/config/transports/splithttp.html#extra'>XHTTP extra object</a>"
 
 msgid "Enable Mux.Cool"
 msgstr "启用 Mux.Cool"
@@ -1480,6 +1498,9 @@ msgstr "端口跳跃时间 "
 msgid "Additional ports for hysteria hop"
 msgstr "端口跳跃额外端口"
 
+msgid "HeartbeatPeriod(second)"
+msgstr "心跳周期（单位：秒）"
+
 msgid "Remove resource files"
 msgstr "删除资源文件"
 
@@ -1489,8 +1510,11 @@ msgstr "Sing-Box 会在启动时自动下载资源文件，您可以使用此功
 msgid "Override the connection destination address"
 msgstr "覆盖连接目标地址"
 
-msgid "Override the connection destination address with the sniffed domain."
-msgstr "用探测出的域名覆盖连接目标地址。"
+msgid "Override the connection destination address with the sniffed domain.<br />Otherwise use sniffed domain for routing only.<br />If using shunt nodes, configure the domain shunt rules correctly."
+msgstr "用探测出的域名覆盖连接目标地址。<br />否则仅将探测得到的域名用于路由。<br />如使用分流节点，请正确设置域名分流规则。"
+
+msgid "Override the connection destination address with the sniffed domain.<br />When enabled, traffic will match only by domain, ignoring IP rules.<br />If using shunt nodes, configure the domain shunt rules correctly."
+msgstr "用探测出的域名覆盖连接目标地址。<br />启用后仅使用域名进行流量匹配，将忽略IP规则。<br />如使用分流节点，请正确设置域名分流规则。"
 
 msgid "Handshake Server"
 msgstr "握手服务器"
@@ -1564,7 +1588,10 @@ msgstr "延迟（ms）"
 msgid "If is domain name, The requested domain name will be resolved to IP before connect."
 msgstr "如果是域名，域名将在请求发出之前解析为 IP。"
 
-msgid "Landing node"
+msgid "Chain Proxy"
+msgstr "链式代理"
+
+msgid "Landing Node"
 msgstr "落地节点"
 
 msgid "Only support a layer of proxy."

@@ -248,7 +248,7 @@ do
 						currentNode = _node_id and uci:get_all(appname, _node_id) or nil,
 						remarks = "分流" .. e.remarks .. "节点",
 						set = function(o, server)
-							if not server then server = "nil" end
+							if not server then server = "" end
 							uci:set(appname, node_id, e[".name"], server)
 							o.newNodeId = server
 						end
@@ -312,6 +312,23 @@ do
 				}
 			end
 		else
+			--前置代理节点
+			local currentNode = uci:get_all(appname, node_id) or nil
+			if currentNode and currentNode.preproxy_node then
+				CONFIG[#CONFIG + 1] = {
+					log = true,
+					id = node_id,
+					remarks = "节点[" .. node_id .. "]前置代理节点",
+					currentNode = uci:get_all(appname, currentNode.preproxy_node) or nil,
+					set = function(o, server)
+						uci:set(appname, node_id, "preproxy_node", server)
+						o.newNodeId = server
+					end,
+					delete = function(o)
+						uci:delete(appname, node_id, "preproxy_node")
+					end
+				}
+			end
 			--落地节点
 			local currentNode = uci:get_all(appname, node_id) or nil
 			if currentNode and currentNode.to_node then
@@ -488,6 +505,16 @@ local function processData(szType, content, add_mode, add_from)
 		if info.net == 'xhttp' or info.net == 'splithttp' then
 			result.xhttp_host = info.host
 			result.xhttp_path = info.path
+			result.xhttp_mode = params.mode or "auto"
+			result.xhttp_extra = params.extra
+			local success, Data = pcall(jsonParse, params.extra)
+				if success and Data then
+					local address = (Data.extra and Data.extra.downloadSettings and Data.extra.downloadSettings.address)
+							or (Data.downloadSettings and Data.downloadSettings.address)
+					result.download_address = address and address ~= "" and address or nil
+				else
+					result.download_address = nil
+				end
 		end
 		if not info.security then result.security = "auto" end
 		if info.tls == "tls" or info.tls == "1" then
@@ -1177,12 +1204,19 @@ local function processData(szType, content, add_mode, add_from)
 	return result
 end
 
-local function curl(url, file, ua)
+local function curl(url, file, ua, mode)
 	local curl_args = api.clone(api.curl_args)
 	if ua and ua ~= "" and ua ~= "curl" then
 		table.insert(curl_args, '--user-agent "' .. ua .. '"')
 	end
-	local return_code, result = api.curl_logic(url, file, curl_args)
+	local return_code
+	if mode == "direct" then
+		return_code = api.curl_direct(url, file, curl_args)
+	elseif mode == "proxy" then
+		return_code = api.curl_proxy(url, file, curl_args)
+	else
+		return_code = api.curl_auto(url, file, curl_args)
+	end
 	return return_code
 end
 
@@ -1200,10 +1234,10 @@ local function truncate_nodes(add_from)
 			if config.currentNode and config.currentNode.add_mode == "2" then
 				if add_from then
 					if config.currentNode.add_from and config.currentNode.add_from == add_from then
-						config.set(config, "nil")
+						config.set(config, "")
 					end
 				else
-					config.set(config, "nil")
+					config.set(config, "")
 				end
 				if config.id then
 					uci:delete(appname, config.id)
@@ -1337,7 +1371,7 @@ local function select_node(nodes, config)
 			config.set(config, server)
 		end
 	else
-		config.set(config, "nil")
+		config.set(config, "")
 	end
 end
 
@@ -1571,8 +1605,10 @@ local execute = function()
 				domain_strategy_node = domain_strategy_default
 			end
 			local ua = value.user_agent
-			log('正在订阅:【' .. remark .. '】' .. url)
-			local raw = curl(url, "/tmp/" .. cfgid, ua)
+			local access_mode = value.access_mode
+			local result = (not access_mode) and "自动" or (access_mode == "direct" and "直连访问" or (access_mode == "proxy" and "通过代理" or "自动"))
+			log('正在订阅:【' .. remark .. '】' .. url .. ' [' .. result .. ']')
+			local raw = curl(url, "/tmp/" .. cfgid, ua, access_mode)
 			if raw == 0 then
 				local f = io.open("/tmp/" .. cfgid, "r")
 				local stdout = f:read("*all")

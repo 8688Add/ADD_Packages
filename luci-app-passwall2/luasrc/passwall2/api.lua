@@ -17,6 +17,8 @@ DISTRIB_ARCH = nil
 
 LOG_FILE = "/tmp/log/passwall2.log"
 CACHE_PATH = "/tmp/etc/passwall2_tmp"
+TMP_PATH = "/tmp/etc/" .. appname
+TMP_IFACE_PATH = TMP_PATH .. "/iface"
 
 function log(...)
 	local result = os.date("%Y-%m-%d %H:%M:%S: ") .. table.concat({...}, " ")
@@ -25,6 +27,15 @@ function log(...)
 		f:write(result .. "\n")
 		f:close()
 	end
+end
+
+function set_cache_var(key, val)
+	sys.call(string.format('/usr/share/passwall2/app.sh set_cache_var %s "%s"', key, val))
+end
+function get_cache_var(key)
+	local val = sys.exec(string.format('echo -n $(/usr/share/passwall2/app.sh get_cache_var %s)', key))
+	if val == "" then val = nil end
+	return val
 end
 
 function exec_call(cmd)
@@ -62,6 +73,29 @@ function base64Decode(text)
 	end
 end
 
+--提取URL中的域名和端口(no ip)
+function get_domain_port_from_url(url)
+	local scheme, domain, port = string.match(url, "^(https?)://([%w%.%-]+):?(%d*)")
+	if not domain then
+		scheme, domain, port = string.match(url, "^(https?)://(%b[])([^:/]*)/?")
+	end
+	if not domain then return nil, nil end
+	if domain:sub(1, 1) == "[" then domain = domain:sub(2, -2) end
+	port = port ~= "" and tonumber(port) or (scheme == "https" and 443 or 80)
+	if datatypes.ipaddr(domain) or datatypes.ip6addr(domain) then return nil, nil end
+	return domain, port
+end
+
+--解析域名
+function domainToIPv4(domain, dns)
+	local Dns = dns or "223.5.5.5"
+	local IPs = luci.sys.exec('nslookup %s %s | awk \'/^Name:/{getline; if ($1 == "Address:") print $2}\'' % { domain, Dns })
+	for IP in string.gmatch(IPs, "%S+") do
+		if datatypes.ipaddr(IP) and not datatypes.ip6addr(IP) then return IP end
+	end
+	return nil
+end
+
 function curl_base(url, file, args)
 	if not args then args = {} end
 	if file then
@@ -73,8 +107,8 @@ end
 
 function curl_proxy(url, file, args)
 	--使用代理
-	local socks_server = luci.sys.exec("[ -f /tmp/etc/passwall2/acl/default/SOCKS_server ] && echo -n $(cat /tmp/etc/passwall2/acl/default/SOCKS_server) || echo -n ''")
-	if socks_server ~= "" then
+	local socks_server = get_cache_var("GLOBAL_SOCKS_server")
+	if socks_server and socks_server ~= "" then
 		if not args then args = {} end
 		local tmp_args = clone(args)
 		tmp_args[#tmp_args + 1] = "-x socks5h://" .. socks_server
@@ -87,6 +121,28 @@ function curl_logic(url, file, args)
 	local return_code, result = curl_proxy(url, file, args)
 	if not return_code or return_code ~= 0 then
 		return_code, result = curl_base(url, file, args)
+	end
+	return return_code, result
+end
+
+function curl_direct(url, file, args)
+	--直连访问
+	if not args then args = {} end
+	local tmp_args = clone(args)
+	local domain, port = get_domain_port_from_url(url)
+	if domain then
+		local ip = domainToIPv4(domain)
+		if ip then
+			tmp_args[#tmp_args + 1] = "--resolve " .. domain .. ":" .. port .. ":" .. ip
+		end
+	end
+	return curl_base(url, file, tmp_args)
+end
+
+function curl_auto(url, file, args)
+	local return_code, result = curl_proxy(url, file, args)
+	if not return_code or return_code ~= 0 then
+		return_code, result = curl_direct(url, file, args)
 	end
 	return return_code, result
 end
@@ -147,6 +203,28 @@ function repeat_exist(table, value)
 	end
 	if count > 1 then
 		return true
+	end
+	return false
+end
+
+function remove(...)
+	for index, value in ipairs({...}) do
+		if value and #value > 0 and value ~= "/" then
+			sys.call(string.format("rm -rf %s", value))
+		end
+	end
+end
+
+function is_install(package)
+	if package and #package > 0 then
+		local file_path = "/usr/lib/opkg/info"
+		local file_ext = ".control"
+		local has = sys.call("[ -d " .. file_path .. " ]")
+		if has == 0 then
+			file_path = "/lib/apk/packages"
+			file_ext = ".list"
+		end
+		return sys.call(string.format('[ -s "%s/%s%s" ]', file_path, package, file_ext)) == 0
 	end
 	return false
 end
@@ -289,6 +367,26 @@ function get_domain_from_url(url)
 		return domain
 	end
 	return url
+end
+
+function get_node_name(node_id)
+	local e
+	if type(node_id) == "table" then
+		e = node_id
+	else
+		e = uci:get_all(appname, node_id)
+	end
+	if e then
+		if e.type and e.remarks then
+			if e.protocol and (e.protocol == "_balancing" or e.protocol == "_shunt" or e.protocol == "_iface") then
+				local type = e.type
+				if type == "sing-box" then type = "Sing-Box" end
+				local remark = "%s：[%s] " % {type .. " " .. i18n.translatef(e.protocol), e.remarks}
+				return remark
+			end
+		end
+	end
+	return ""
 end
 
 function get_valid_nodes()
@@ -1069,11 +1167,16 @@ function luci_types(id, m, s, type_name, option_prefix)
 				end
 				s.fields[key].write = function(self, section, value)
 					if s.fields["type"]:formvalue(id) == type_name then
-						if self.rewrite_option then
-							m:set(section, self.rewrite_option, value)
+						-- 添加自定义 custom_write 属性，如果有自定义的 custom_write 函数，则使用自定义的 write 逻辑
+						if self.custom_write then
+							self:custom_write(section, value)
 						else
-							if self.option:find(option_prefix) == 1 then
-								m:set(section, self.option:sub(1 + #option_prefix), value)
+							if self.rewrite_option then
+								m:set(section, self.rewrite_option, value)
+							else
+								if self.option:find(option_prefix) == 1 then
+									m:set(section, self.option:sub(1 + #option_prefix), value)
+								end
 							end
 						end
 					end
